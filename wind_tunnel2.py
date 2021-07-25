@@ -27,7 +27,7 @@ def temp_init():
     adt.high_resolution = True
     return adt
 
-def accel_init():
+def accel_init(bus):
     # id of mpu sensor (found through i2cdetect command)
     dev_addr = 0x69
     # define useful registers
@@ -120,8 +120,8 @@ def read_pres(bus, cal_data):
 def main():
     bus = smbus.SMBus(1)
 
-    pres_cal_data = pres_init()
-    accel_addr = accel_init()
+    pres_cal_data = pres_init(bus)
+    accel_addr = accel_init(bus)
     adt = temp_init()
 
     with open('wind_tunnel.csv', mode='w') as datafile:
