@@ -17,13 +17,14 @@ def pres_init(bus):
     # calibration data addresses:
     # [pres sens, pres off, temp coef sens, temp coef off, ref temp, temp coef of temp]
     cal_data_addrs = [0xA2, 0xA4, 0xA6, 0xA8, 0xAA, 0xAC]
-    cal_data = [int.from_bytes(bus.read_i2c_block_data(pres_addr, addr, 2)) for addr in cal_data_addrs]
+    cal_data = [int.from_bytes(bus.read_i2c_block_data(pres_addr, addr, 2), "big") for addr in cal_data_addrs]
 
-    return cal_data
+    return [pres_addr, cal_data]
 
 def temp_init():
+    temp_addr = 0x48 #found through i2cdetect
     i2c_bus = busio.I2C(board.SCL, board.SDA)
-    adt = adafruit_adt7410.ADT7410(i2c_bus, address=0x48)
+    adt = adafruit_adt7410.ADT7410(i2c_bus, address=temp_addr)
     adt.high_resolution = True
     return adt
 
@@ -51,12 +52,11 @@ def accel_init(bus):
     return dev_addr
 
 def read_temp(adt):
-    temp = adt.temperature()
-    return temp
+    return adt.temperature
 
 def read_acc_data(bus, dev_addr, addr):
     #not sure where these calculations come from
-    return 9.81 * int.from_bytes(bus.ready_i2c_block_data(dev_addr, addr, 2), "big")/16384.0
+    return 9.81 * int.from_bytes(bus.read_i2c_block_data(dev_addr, addr, 2), "big")/16384.0
 
 def read_accel(bus, dev_addr):
     acc_x = read_acc_data(bus, dev_addr, 0x3b)
@@ -67,15 +67,13 @@ def read_accel(bus, dev_addr):
 
 #read the digital pressure and temperature values
 #calculate the temperature difference and actual temperature
-def read_pres_setup(bus, tempRef, tempCoefRef):
-    bus.write_byte(pres_addr, 0x1E) # reset
-
+def read_pres_setup(bus, pres_addr, tempRef, tempCoefRef):
     dpres = int.from_bytes(bus.read_i2c_block_data(pres_addr, 0x00, 3), "big")
 
     bus.write_byte(pres_addr, 0x50) #temp conversion cmd
     time.sleep(0.5)
 
-    dtemp = int.from_btes(bus.read_i2c_block_data(pres_addr, 0x00, 3), "big")
+    dtemp = int.from_bytes(bus.read_i2c_block_data(pres_addr, 0x00, 3), "big")
 
     #using formulas from datasheet:
     dT = dtemp - tempRef * pow(2,8) #diff between actual and ref temps
@@ -84,8 +82,8 @@ def read_pres_setup(bus, tempRef, tempCoefRef):
     return dpres, dtemp, dT, TEMP
 
 #Read Pressure Value
-def read_pres(bus, cal_data):
-    dpres, dtemp, dT, TEMP = read_pres_setup(bus, cal_data[4], cal_data[5])
+def read_pres(bus, pres_addr, cal_data):
+    dpres, dtemp, dT, TEMP = read_pres_setup(bus, pres_addr, cal_data[4], cal_data[5])
 
     #calculate offset and sensitivity using formula from datasheet
     OFF  = cal_data[1]  * pow(2,17) + (cal_data[3]  * dT)  / pow(2,6)
@@ -120,7 +118,7 @@ def read_pres(bus, cal_data):
 def main():
     bus = smbus.SMBus(1)
 
-    pres_cal_data = pres_init(bus)
+    pres_addr,pres_cal_data = pres_init(bus)
     accel_addr = accel_init(bus)
     adt = temp_init()
 
@@ -129,12 +127,12 @@ def main():
         t0 = time.time()
 
         # keep reading data when elapse time is less than 1 hour
-        while (t0 - time.time()) < 3600:
+        while (time.time()-t0) < 50:
             temp = read_temp(adt)
-            pres, temp_ref = read_pres(bus, pres_cal_data)
+            pres, temp_ref = read_pres(bus, pres_addr, pres_cal_data)
             acc_x, acc_y, acc_z = read_accel(bus, accel_addr)
-            temp_writer.writerow([temp, pres, temp_ref, acc_x, acc_y, acc_z, time.time()])
+            write_data.writerow([temp, pres, temp_ref, acc_x, acc_y, acc_z, time.time()])
             #delay to allow for data to be collected
-            sleep(0.5)
+            time.sleep(0.5)
 
 main()
