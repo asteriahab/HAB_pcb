@@ -124,6 +124,8 @@ def main():
 
     with open('wind_tunnel.csv', mode='w') as datafile:
         write_data = csv.writer(datafile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        write_data.writerow(['Time Elapsed', 'Temp', 'Pressure', 'X', 'Y', 'Z'])
+
         t0 = time.time()
 
         # keep reading data when elapse time is less than 1 hour
@@ -131,7 +133,7 @@ def main():
             temp = read_temp(adt)
             pres, temp_ref = read_pres(bus, pres_addr, pres_cal_data)
             acc_x, acc_y, acc_z = read_accel(bus, accel_addr)
-            write_data.writerow([temp, pres, temp_ref, acc_x, acc_y, acc_z, time.time()])
+            write_data.writerow([time.time()-t0, temp, pres, acc_x, acc_y, acc_z])
             #delay to allow for data to be collected
             time.sleep(0.5)
 
