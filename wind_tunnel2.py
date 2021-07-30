@@ -12,7 +12,7 @@ import csv
 # Reads num_bytes of data from data_addr in sens_addr and converts to int
 # Assumes MSB is first
 def readi2c(bus, sens_addr, data_addr, num_bytes):
-    return int.from_bytes(bus.read_i2c_block_data(pres_addr, addr, 2), "big")
+    return int.from_bytes(bus.read_i2c_block_data(sens_addr, data_addr, num_bytes), "big")
 
 # Define the address of the pressure sensor and read all 6 calibration variables
 # Returns the sensor address and calibration data
@@ -80,7 +80,7 @@ def read_accel(bus, dev_addr):
 # Read and return the digital pressure and temperature values
 # Calculate and return the temperature difference and actual temperature
 def read_pres_setup(bus, pres_addr, tempRef, tempCoefRef):
-    dpres = readi2c(bus, pres_addr, 0x00, 3))
+    dpres = readi2c(bus, pres_addr, 0x00, 3)
 
     bus.write_byte(pres_addr, 0x50) # temp conversion cmd
     time.sleep(0.5)
