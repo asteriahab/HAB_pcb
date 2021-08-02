@@ -80,6 +80,9 @@ def read_accel(bus, dev_addr):
 # Read and return the digital pressure and temperature values
 # Calculate and return the temperature difference and actual temperature
 def read_pres_setup(bus, pres_addr, tempRef, tempCoefRef):
+    bus.write_byte(pres_addr, 0x40) #pressure conversion cmd
+    time.sleep(0.5)
+
     dpres = readi2c(bus, pres_addr, 0x00, 3)
 
     bus.write_byte(pres_addr, 0x50) # temp conversion cmd
@@ -88,7 +91,7 @@ def read_pres_setup(bus, pres_addr, tempRef, tempCoefRef):
     dtemp = readi2c(bus, pres_addr, 0x00, 3)
 
     # using formulas from datasheet:
-    dT = dtemp - tempRef * pow(2,8) #d iff between actual and ref temps
+    dT = dtemp - tempRef * pow(2,8) #diff between actual and ref temps
     TEMP = 2000 + dT * tempCoefRef / pow(2,23) # actual temperature
 
     return dpres, dtemp, dT, TEMP
