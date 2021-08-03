@@ -1,12 +1,9 @@
-#same as wind_tunnel.py with some modfications
-#include pressure, temperature, and imu code
-#code to start running as soon as pi is switched on
-
 import smbus
 import time
 import board
 import busio
 import adafruit_adt7410
+import qwiic_icm20948
 import csv
 
 # Reads num_bytes of data from data_addr in sens_addr and converts to int
@@ -35,47 +32,22 @@ def temp_init():
     adt.high_resolution = True
     return adt
 
-# Define the address of the accelerometer and configure the sensor
-# Returns the sensor address
-def accel_init(bus):
-    dev_addr = 0x69 #ICM-20984 address
+# Initializes qwiic_icm20948 object accessing the imu
+def imu_init():
+   IMU = qwiic_icm20948.QwiicIcm20948()
+   if IMU.connected:
+       IMU.begin()
+       return IMU
 
-    # define useful registers
-    SMPLRT_DIV = 0x19
-    CONFIG = 0x1A
-    GYRO_CONFIG = 0x1B
-    INT_ENABLE = 0x1B
-    PWR_MGMT_1 = 0X6B
-
-    # write to sample rate register
-    bus.write_byte_data(dev_addr, SMPLRT_DIV, 7)    #check number 7
-    # write to power management register
-    bus.write_byte_data(dev_addr, PWR_MGMT_1, 1)
-    # write to config register
-    bus.write_byte_data(dev_addr, CONFIG, 0)
-    # write to configure gyro register
-    bus.write_byte_data(dev_addr, GYRO_CONFIG, 24)
-    # write to interrupt enable register
-    bus.write_byte_data(dev_addr, INT_ENABLE, 1)
-
-    return dev_addr
+# Reads all 9-axis inertial measurements from the IMU's accelerometer, gyroscope, and magnetorquer
+def read_imu(IMU):
+    if IMU.dataReady():
+        IMU.getAgmt()
+        return [IMU.axRaw, IMU.ayRaw, IMU.azRaw, IMU.gxRaw, IMU.gyRaw, IMU.gzRaw, IMU.mxRaw, IMU.myRaw, IMU.mzRaw]
 
 # Reads and returns the temperature from the temperature sensor
 def read_temp(adt):
     return adt.temperature
-
-# Read, process, and return accelerometer data from addr
-def read_acc_data(bus, dev_addr, addr):
-    # not sure where these calculations come from
-    return 9.81 * readi2c(bus, dev_addr, addr, 2)/16384.0
-
-# Read and return three-axis of accelermoter data
-def read_accel(bus, dev_addr):
-    acc_x = read_acc_data(bus, dev_addr, 0x3b)
-    acc_y = read_acc_data(bus, dev_addr, 0x3d)
-    acc_z = read_acc_data(bus, dev_addr, 0x3f)
-
-    return acc_x, acc_y, acc_z
 
 # Read and return the digital pressure and temperature values
 # Calculate and return the temperature difference and actual temperature
@@ -135,27 +107,27 @@ def main():
 
     # initialize all sensors
     pres_addr,pres_cal_data = pres_init(bus)
-    accel_addr = accel_init(bus)
+    IMU = imu_init()
     adt = temp_init()
 
     # Open file where data will be collected
     with open('wind_tunnel.csv', mode='w') as datafile:
         # initialize file writer and add header row to csv
         write_data = csv.writer(datafile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        write_data.writerow(['Time Elapsed', 'Temp', 'Pressure', 'X', 'Y', 'Z'])
+        write_data.writerow(['Time Elapsed', 'Temp', 'Pressure', 'aX', 'aY', 'aZ', 'gX', 'gY', 'gZ', 'mX', 'mY', 'mZ'])
 
         # record current time for reference
         t0 = time.time()
 
         # keep reading data for given number of seconds
-        while (time.time()-t0) < 50:
+        while (time.time()-t0) < 10:
             # read temperature, pressure, and accelerometer data
             temp = read_temp(adt)
             pres = read_pres(bus, pres_addr, pres_cal_data)
-            acc_x, acc_y, acc_z = read_accel(bus, accel_addr)
+            ax,ay,az,gx,gy,gz,mx,my,mz = read_imu(IMU)
 
             # add collected data to csv
-            write_data.writerow([time.time()-t0, temp, pres, acc_x, acc_y, acc_z])
+            write_data.writerow([time.time()-t0, temp, pres, ax, ay, az, gx, gy, gz, mx, my, mz])
 
             #delay to prevent excessive data collection
             time.sleep(0.5)
