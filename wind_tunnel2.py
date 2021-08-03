@@ -120,7 +120,7 @@ def main():
         t0 = time.time()
 
         # keep reading data for given number of seconds
-        while (time.time()-t0) < 10:
+        while (time.time()-t0) < 60:
             # read temperature, pressure, and accelerometer data
             temp = read_temp(adt)
             pres = read_pres(bus, pres_addr, pres_cal_data)
