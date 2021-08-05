@@ -7,53 +7,102 @@ import qwiic_icm20948
 import csv
 
 bus = None #Initialized in main
+IMU = None # //
+adt = None # //
+pres_cal_data = None #
 
 pres_addr = 0x76 # MS5803_02BA address
 temp_addr = 0x48 #ADT7410 address
 imu_addr  = 0x69 #ICM20948 address
 
+pres_cal_addr = 0xA2 #starting address for pressure sensor calibration data
+
 # Reads num_bytes of data from data_addr in sens_addr and converts to int
 # Assumes MSB is first
 def readi2c(sens_addr, data_addr, num_bytes):
-    return int.from_bytes(bus.read_i2c_block_data(sens_addr, data_addr, num_bytes), "big")
+    if bus:
+        try:
+            return int.from_bytes(bus.read_i2c_block_data(sens_addr, data_addr, num_bytes), "big")
+        except:
+            pass
+    else:
+        init_bus()
 
+    return None
+
+def writei2c(addr,val):
+    if bus:
+        try:
+            bus.write_byte(addr, val)
+            return True
+        except:
+            pass
+    else:
+        init_bus()
+
+    return False
+
+def bus_init():
+    try:
+        bus = smbus.SMBus(1)
+    except:
+        pass
 # Define the address of the pressure sensor and read all 6 calibration variables
 # Returns the sensor address and calibration data
 def pres_init():
     # 6 calibration values addresses are 2 bytes each starting at 0xA2
-    cal_addr = 0xA2
-    cal_data_addrs = [cal_addr+2*n for n in range(6)]
-    cal_data = [readi2c(pres_addr, addr, 2) for addr in cal_data_addrs]
-
-    return cal_data
+    cal_data_addrs = [pres_cal_addr+2*n for n in range(6)]
+    pres_cal_data = [readi2c(pres_addr, addr, 2) for addr in cal_data_addrs]
+    if None in pres_cal_data:
+        pres_cal_data = None
 
 # Define the address of the temperature sensor and configures the sensor
 # Returns Adafruit object for the sensor
 def temp_init():
-    i2c_bus = busio.I2C(board.SCL, board.SDA)
-    adt = adafruit_adt7410.ADT7410(i2c_bus, address=temp_addr)
-    adt.high_resolution = True
-    return adt
+    try:
+        i2c_bus = busio.I2C(board.SCL, board.SDA)
+        adt = adafruit_adt7410.ADT7410(i2c_bus, address=temp_addr)
+        adt.high_resolution = True
+    except:
+        return None
 
 # Initializes qwiic_icm20948 object accessing the imu
 def imu_init():
-   IMU = qwiic_icm20948.QwiicIcm20948(imu_addr)
-   if IMU.connected:
-       IMU.begin()
-       return IMU
+    try:
+       IMU = qwiic_icm20948.QwiicIcm20948(imu_addr)
+       if IMU.connected:
+           IMU.begin()
+    except:
+        pass
 
 # Reads all 9-axis inertial measurements from the IMU's accelerometer, gyroscope, and magnetorquer
 def read_imu(IMU):
-    if IMU.dataReady():
-        IMU.getAgmt()
-        return [IMU.axRaw, IMU.ayRaw, IMU.azRaw, IMU.gxRaw, IMU.gyRaw, IMU.gzRaw, IMU.mxRaw, IMU.myRaw, IMU.mzRaw]
+    if IMU:
+        try:
+            if IMU.dataReady():
+                IMU.getAgmt()
+                return [IMU.axRaw, IMU.ayRaw, IMU.azRaw, IMU.gxRaw, IMU.gyRaw, IMU.gzRaw, IMU.mxRaw, IMU.myRaw, IMU.mzRaw]
+        except:
+            pass
+    else:
+        imu_init()
+
+    return [None for _ in range(9)]
 
 # Reads and returns the temperature from the temperature sensor
-def read_temp(adt):
-    return adt.temperature
+def read_temp():
+    if adt:
+        try:
+            return adt.temperature
+        except:
+            pass
+    else:
+        temp_init()
+
+    return None
 
 # Apply second order temperature compensation for temperatures below 20C for higher accuracy
-def add_pres_comp(TEMP, OFF, SENS):
+def add_pres_comp(dT, TEMP, OFF, SENS):
     T2 = 0
     OFF2 = 0
     SENS2 = 0
@@ -76,26 +125,33 @@ def add_pres_comp(TEMP, OFF, SENS):
     return [TEMP, OFF, SENS]
 
 # Read, process, and return pressure data from pressure sensor
-def read_pres(cal_data):
+def read_pres():
+    if not pres_cal_data:
+        pres_init()
+        return None
     # read digital pressure value
-    bus.write_byte(pres_addr, 0x40) #pressure conversion cmd
-    time.sleep(0.5)
-    dpres = readi2c(pres_addr, 0x00, 3)
+    if writei2c(pres_addr, 0x40): #pressure conversion cmd
+        time.sleep(0.5)
+        dpres = readi2c(pres_addr, 0x00, 3)
+    else:
+        return None
 
     # read digital temperature value
-    bus.write_byte(pres_addr, 0x50) # temp conversion cmd
-    time.sleep(0.5)
-    dtemp = readi2c(pres_addr, 0x00, 3)
+    if writei2c(pres_addr, 0x50): # temp conversion cmd
+        time.sleep(0.5)
+        dtemp = readi2c(pres_addr, 0x00, 3)
+    else:
+        return None
 
     # using formulas from datasheet:
-    dT = dtemp - cal_data[4] * pow(2,8) #diff between actual and ref temps
-    TEMP = 2000 + dT * cal_data[5] / pow(2,23) # actual temperature
+    dT = dtemp - pres_cal_data[4] * pow(2,8) #diff between actual and ref temps
+    TEMP = 2000 + dT * pres_cal_data[5] / pow(2,23) # actual temperature
 
     # calculate offset and sensitivity using formula from datasheet
-    OFF  = cal_data[1]  * pow(2,17) + (cal_data[3]  * dT)  / pow(2,6)
-    SENS = cal_data[0] * pow(2,16) + (cal_data[2] * dT ) / pow(2,7)
+    OFF  = pres_cal_data[1]  * pow(2,17) + (pres_cal_data[3]  * dT)  / pow(2,6)
+    SENS = pres_cal_data[0] * pow(2,16) + (pres_cal_data[2] * dT ) / pow(2,7)
 
-    TEMP, OFF, SENS = add_pres_comp(TEMP, OFF, SENS)
+    TEMP, OFF, SENS = add_pres_comp(dT, TEMP, OFF, SENS)
 
     # calculate final pressure reading
     pressure = (dpres * SENS / pow(2,21) - OFF) / pow(2,15) / 100.0
@@ -103,12 +159,11 @@ def read_pres(cal_data):
     return pressure
 
 def main():
-    bus = smbus.SMBus(1)
-
-    # initialize all sensors
-    pres_cal_data = pres_init()
-    IMU = imu_init()
-    adt = temp_init()
+    # initialize all sensors and i2c bus
+    init_bus()
+    pres_init()
+    imu_init()
+    temp_init()
 
     # Open file where data will be collected
     with open('wind_tunnel.csv', mode='w') as datafile:
