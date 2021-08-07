@@ -40,6 +40,7 @@ def write_i2c(addr,val):
 
 # Initialize the i2c bus
 def bus_init():
+    global bus
     try:
         bus = smbus.SMBus(1)
     except:
@@ -47,12 +48,14 @@ def bus_init():
 
 # Read all 6 2-byte calibration variables for the pressure sensor
 def pres_init():
+    global pres_cal_data
     pres_cal_data = [read_i2c(PRES_ADDR, addr, 2) for addr in range (PRES_CAL_ADDR, PRES_CAL_ADDR+11, 2)]
     if None in pres_cal_data:
         pres_cal_data = None
 
 # Initialize the temperature sensor object
 def temp_init():
+    global adt
     try:
         i2c_bus = busio.I2C(board.SCL, board.SDA)
         adt = adafruit_adt7410.ADT7410(i2c_bus, address=TEMP_ADDR)
@@ -62,6 +65,7 @@ def temp_init():
 
 # Initialize the IMU object
 def imu_init():
+    global IMU
     try:
        IMU = qwiic_icm20948.QwiicIcm20948(IMU_ADDR)
        if IMU.connected:
