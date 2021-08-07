@@ -12,9 +12,6 @@ IMU = None
 adt = None
 pres_cal_data = None
 
-datafile = None # Where data will be collected
-buffer = [] # Store collected data locally before writing to datafile
-
 PRES_ADDR = 0x76 # MS5803_02BA address
 TEMP_ADDR = 0x48 # ADT7410 address
 IMU_ADDR  = 0x69 # ICM20948 address
@@ -40,15 +37,6 @@ def write_i2c(addr,val):
         bus_init()
 
     return False
-
-# Open the data file and initialize the file writer
-def file_init():
-    try:
-        datafile = open('wind_tunnel.csv', mode='a')
-        filewriter = csv.writer(datafile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-    except:
-        datafile = None
-        filewriter = None
 
 # Initialize the i2c bus
 def bus_init():
@@ -82,7 +70,7 @@ def imu_init():
         IMU = None
 
 # Read all 9-axis inertial measurements from the IMU's accelerometer, gyroscope, and magnetorquer
-def read_imu(IMU):
+def read_imu():
     try:
         if IMU.dataReady():
             IMU.getAgmt()
@@ -157,40 +145,24 @@ def read_pres():
 
     return pressure
 
-# Initialize all sensors and i2c bus and open the data file
-def setup():
+def main():
     bus_init()
     pres_init()
     imu_init()
     temp_init()
-    file_init()
 
-# Collect all data from the sensors and store in the buffer
-def readData():
-    temp = read_temp(adt)
-    pres = read_pres(pres_cal_data)
-    ax,ay,az,gx,gy,gz,mx,my,mz = read_imu(IMU)
-    buffer.append([time.time(), temp, pres, ax, ay, az, gx, gy, gz, mx, my, mz])
+    with open('wind_tunnel.csv', mode='a') as datafile:
+        filewriter = csv.writer(datafile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
-# Write data in the buffer to the data file
-def writeData():
-    try:
-        filewriter.writerows(buffer)
-        datafile.flush()  #make sure no data left in file buffer
-        buffer = [] # clear local buffer
-    except:
-        datafile.close()
-        file_init()
+        while True:
+            temp = read_temp()
+            pres = read_pres()
+            ax,ay,az,gx,gy,gz,mx,my,mz = read_imu()
 
-def main():
-    setup()
+            filewriter.writerow([time.time(), temp, pres, ax, ay , az, gx, gy, gz, mx, my, mz])
+            datafile.flush() #make sure no data left in file buffer
 
-    while True:
-        readData()
-        writeData()
-        time.sleep(0.5)
-
-    datafile.close()
+            time.sleep(0.5)
 
 if __name__ == "__main__":
     main()
