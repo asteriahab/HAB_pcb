@@ -6,97 +6,97 @@ import adafruit_adt7410
 import qwiic_icm20948
 import csv
 
-bus = None #Initialized in main
-IMU = None # //
-adt = None # //
-pres_cal_data = None #
+# Used to initialize the sensors and bus
+bus = None
+IMU = None
+adt = None
+pres_cal_data = None
 
-pres_addr = 0x76 # MS5803_02BA address
-temp_addr = 0x48 #ADT7410 address
-imu_addr  = 0x69 #ICM20948 address
+datafile = None # Where data will be collected
+buffer = [] # Store collected data locally before writing to datafile
 
-pres_cal_addr = 0xA2 #starting address for pressure sensor calibration data
+PRES_ADDR = 0x76 # MS5803_02BA address
+TEMP_ADDR = 0x48 # ADT7410 address
+IMU_ADDR  = 0x69 # ICM20948 address
+PRES_CAL_ADDR = 0xA2 # Starting address for pressure sensor calibration data
+PRES_CONVERT_CMD = 0x40 # Conversion command to read digital pressure value on pressure sensor
+TEMP_CONVERT_CMD = 0x50 # Conversion command to read digital temperature value on pressure sensor
 
-# Reads num_bytes of data from data_addr in sens_addr and converts to int
-# Assumes MSB is first
-def readi2c(sens_addr, data_addr, num_bytes):
-    if bus:
-        try:
-            return int.from_bytes(bus.read_i2c_block_data(sens_addr, data_addr, num_bytes), "big")
-        except:
-            pass
-    else:
-        init_bus()
+# Read num_bytes of data from data_addr in sens_addr and converts to int
+def read_i2c(sens_addr, data_addr, num_bytes):
+    try:
+        return int.from_bytes(bus.read_i2c_block_data(sens_addr, data_addr, num_bytes), "big")
+    except:
+        bus_init()
 
     return None
 
-def writei2c(addr,val):
-    if bus:
-        try:
-            bus.write_byte(addr, val)
-            return True
-        except:
-            pass
-    else:
-        init_bus()
+# Write given value for the given address to the i2c bus
+def write_i2c(addr,val):
+    try:
+        bus.write_byte(addr, val)
+        return True
+    except:
+        bus_init()
 
     return False
 
+# Open the data file and initialize the file writer
+def file_init():
+    try:
+        datafile = open('wind_tunnel.csv', mode='a')
+        filewriter = csv.writer(datafile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    except:
+        datafile = None
+        filewriter = None
+
+# Initialize the i2c bus
 def bus_init():
     try:
         bus = smbus.SMBus(1)
     except:
-        pass
-# Define the address of the pressure sensor and read all 6 calibration variables
-# Returns the sensor address and calibration data
+        bus = None
+
+# Read all 6 2-byte calibration variables for the pressure sensor
 def pres_init():
-    # 6 calibration values addresses are 2 bytes each starting at 0xA2
-    cal_data_addrs = [pres_cal_addr+2*n for n in range(6)]
-    pres_cal_data = [readi2c(pres_addr, addr, 2) for addr in cal_data_addrs]
+    pres_cal_data = [read_i2c(PRES_ADDR, addr, 2) for addr in range (PRES_CAL_ADDR, PRES_CAL_ADDR+11, 2)]
     if None in pres_cal_data:
         pres_cal_data = None
 
-# Define the address of the temperature sensor and configures the sensor
-# Returns Adafruit object for the sensor
+# Initialize the temperature sensor object
 def temp_init():
     try:
         i2c_bus = busio.I2C(board.SCL, board.SDA)
-        adt = adafruit_adt7410.ADT7410(i2c_bus, address=temp_addr)
+        adt = adafruit_adt7410.ADT7410(i2c_bus, address=TEMP_ADDR)
         adt.high_resolution = True
     except:
-        return None
+        adt = None
 
-# Initializes qwiic_icm20948 object accessing the imu
+# Initialize the IMU object
 def imu_init():
     try:
-       IMU = qwiic_icm20948.QwiicIcm20948(imu_addr)
+       IMU = qwiic_icm20948.QwiicIcm20948(IMU_ADDR)
        if IMU.connected:
            IMU.begin()
     except:
-        pass
+        IMU = None
 
-# Reads all 9-axis inertial measurements from the IMU's accelerometer, gyroscope, and magnetorquer
+# Read all 9-axis inertial measurements from the IMU's accelerometer, gyroscope, and magnetorquer
 def read_imu(IMU):
-    if IMU:
-        try:
-            if IMU.dataReady():
-                IMU.getAgmt()
-                return [IMU.axRaw, IMU.ayRaw, IMU.azRaw, IMU.gxRaw, IMU.gyRaw, IMU.gzRaw, IMU.mxRaw, IMU.myRaw, IMU.mzRaw]
-        except:
-            pass
-    else:
+    try:
+        if IMU.dataReady():
+            IMU.getAgmt()
+            return [IMU.axRaw, IMU.ayRaw, IMU.azRaw, IMU.gxRaw, IMU.gyRaw, IMU.gzRaw, IMU.mxRaw, IMU.myRaw, IMU.mzRaw]
+    except:
         imu_init()
 
     return [None for _ in range(9)]
 
-# Reads and returns the temperature from the temperature sensor
+# Read the temperature from the temperature sensor
 def read_temp():
-    if adt:
-        try:
-            return adt.temperature
-        except:
-            pass
-    else:
+    try:
+        return adt.temperature
+    except:
         temp_init()
 
     return None
@@ -124,24 +124,23 @@ def add_pres_comp(dT, TEMP, OFF, SENS):
 
     return [TEMP, OFF, SENS]
 
-# Read, process, and return pressure data from pressure sensor
+# Reads raw digital data from the pressure sensor with a conversion command
+def read_pres_digital(cmd):
+    if write_i2c(PRES_ADDR, cmd):
+        time.sleep(0.5)
+        dpres = read_i2c(PRES_ADDR, 0x00, 3)
+    else:
+        return None
+
+# Read and process pressure data from pressure sensor
 def read_pres():
     if not pres_cal_data:
         pres_init()
         return None
-    # read digital pressure value
-    if writei2c(pres_addr, 0x40): #pressure conversion cmd
-        time.sleep(0.5)
-        dpres = readi2c(pres_addr, 0x00, 3)
-    else:
-        return None
 
-    # read digital temperature value
-    if writei2c(pres_addr, 0x50): # temp conversion cmd
-        time.sleep(0.5)
-        dtemp = readi2c(pres_addr, 0x00, 3)
-    else:
-        return None
+    # read digital pressure and temperature value
+    dpres = read_pres_digital(PRES_CONVERT_CMD)
+    dtemp = read_pres_digital(TEMP_CONVERT_CMD)
 
     # using formulas from datasheet:
     dT = dtemp - pres_cal_data[4] * pow(2,8) #diff between actual and ref temps
@@ -158,33 +157,40 @@ def read_pres():
 
     return pressure
 
-def main():
-    # initialize all sensors and i2c bus
-    init_bus()
+# Initialize all sensors and i2c bus and open the data file
+def setup():
+    bus_init()
     pres_init()
     imu_init()
     temp_init()
+    file_init()
 
-    # Open file where data will be collected
-    with open('wind_tunnel.csv', mode='w') as datafile:
-        # initialize file writer and add header row to csv
-        write_data = csv.writer(datafile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        write_data.writerow(['Time Elapsed', 'Temp', 'Pressure', 'aX', 'aY', 'aZ', 'gX', 'gY', 'gZ', 'mX', 'mY', 'mZ'])
+# Collect all data from the sensors and store in the buffer
+def readData():
+    temp = read_temp(adt)
+    pres = read_pres(pres_cal_data)
+    ax,ay,az,gx,gy,gz,mx,my,mz = read_imu(IMU)
+    buffer.append([time.time(), temp, pres, ax, ay, az, gx, gy, gz, mx, my, mz])
 
-        # record current time for reference
-        t0 = time.time()
+# Write data in the buffer to the data file
+def writeData():
+    try:
+        filewriter.writerows(buffer)
+        datafile.flush()  #make sure no data left in file buffer
+        buffer = [] # clear local buffer
+    except:
+        datafile.close()
+        file_init()
 
-        # keep reading data for given number of seconds
-        while (time.time()-t0) < 60:
-            # read temperature, pressure, and accelerometer data
-            temp = read_temp(adt)
-            pres = read_pres(pres_cal_data)
-            ax,ay,az,gx,gy,gz,mx,my,mz = read_imu(IMU)
+def main():
+    setup()
 
-            # add collected data to csv
-            write_data.writerow([time.time()-t0, temp, pres, ax, ay, az, gx, gy, gz, mx, my, mz])
+    while True:
+        readData()
+        writeData()
+        time.sleep(0.5)
 
-            #delay to prevent excessive data collection
-            time.sleep(0.5)
+    datafile.close()
 
-main()
+if __name__ == "__main__":
+    main()
