@@ -21,6 +21,8 @@ TEMP_CONVERT_CMD = 0x50 # Conversion command to read digital temperature value o
 
 # Read num_bytes of data from data_addr in sens_addr and converts to int
 def read_i2c(sens_addr, data_addr, num_bytes):
+    global bus
+
     try:
         return int.from_bytes(bus.read_i2c_block_data(sens_addr, data_addr, num_bytes), "big")
     except:
@@ -30,6 +32,8 @@ def read_i2c(sens_addr, data_addr, num_bytes):
 
 # Write given value for the given address to the i2c bus
 def write_i2c(addr,val):
+    global bus
+
     try:
         bus.write_byte(addr, val)
         return True
@@ -41,6 +45,7 @@ def write_i2c(addr,val):
 # Initialize the i2c bus
 def bus_init():
     global bus
+
     try:
         bus = smbus.SMBus(1)
     except:
@@ -49,6 +54,7 @@ def bus_init():
 # Read all 6 2-byte calibration variables for the pressure sensor
 def pres_init():
     global pres_cal_data
+
     pres_cal_data = [read_i2c(PRES_ADDR, addr, 2) for addr in range (PRES_CAL_ADDR, PRES_CAL_ADDR+11, 2)]
     if None in pres_cal_data:
         pres_cal_data = None
@@ -56,6 +62,7 @@ def pres_init():
 # Initialize the temperature sensor object
 def temp_init():
     global adt
+
     try:
         i2c_bus = busio.I2C(board.SCL, board.SDA)
         adt = adafruit_adt7410.ADT7410(i2c_bus, address=TEMP_ADDR)
@@ -66,6 +73,7 @@ def temp_init():
 # Initialize the IMU object
 def imu_init():
     global IMU
+
     try:
        IMU = qwiic_icm20948.QwiicIcm20948(IMU_ADDR)
        if IMU.connected:
@@ -75,6 +83,8 @@ def imu_init():
 
 # Read all 9-axis inertial measurements from the IMU's accelerometer, gyroscope, and magnetorquer
 def read_imu():
+    global IMU
+
     try:
         if IMU.dataReady():
             IMU.getAgmt()
@@ -86,6 +96,8 @@ def read_imu():
 
 # Read the temperature from the temperature sensor
 def read_temp():
+    global adt
+
     try:
         return adt.temperature
     except:
@@ -126,6 +138,8 @@ def read_pres_digital(cmd):
 
 # Read and process pressure data from pressure sensor
 def read_pres():
+    global pres_cal_data
+
     if not pres_cal_data:
         pres_init()
         return None
@@ -170,3 +184,14 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# For testing:
+
+def clear_bus():
+    global bus
+    bus = None
+
+def get_bus():
+    global bus
+    return bus
