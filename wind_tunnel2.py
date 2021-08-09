@@ -187,7 +187,6 @@ if __name__ == "__main__":
 
 
 # For testing:
-
 def clear_bus():
     global bus
     bus = None
@@ -195,3 +194,11 @@ def clear_bus():
 def get_bus():
     global bus
     return bus
+
+def clear_adt():
+    global adt
+    adt = None
+
+def get_adt():
+    global adt
+    return adt
