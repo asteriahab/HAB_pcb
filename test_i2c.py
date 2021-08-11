@@ -1,6 +1,7 @@
 import pytest
 from wind_tunnel2.py import bus_init, clear_bus, get_bus, read_i2c, write_i2c
 
+# Dummy exception for mocking
 EXCEPT = Exception('mocked')
 
 @pytest.fixture
