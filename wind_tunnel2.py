@@ -202,3 +202,11 @@ def clear_adt():
 def get_adt():
     global adt
     return adt
+
+def clear_imu():
+    global imu
+    imu = None
+
+def get_imu():
+    global imu
+    return imu
