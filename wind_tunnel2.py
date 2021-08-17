@@ -132,7 +132,7 @@ def add_pres_comp(dT, TEMP, OFF, SENS):
 def read_pres_digital(cmd):
     if write_i2c(PRES_ADDR, cmd):
         time.sleep(0.5)
-        dpres = read_i2c(PRES_ADDR, 0x00, 3)
+        return read_i2c(PRES_ADDR, 0x00, 3)
     else:
         return None
 
