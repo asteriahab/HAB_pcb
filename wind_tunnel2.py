@@ -140,13 +140,17 @@ def read_pres_digital(cmd):
 def read_pres():
     global pres_cal_data
 
-    if not pres_cal_data:
+    if pres_cal_data == None or None in pres_cal_data:
         pres_init()
         return None
 
     # read digital pressure and temperature value
     dpres = read_pres_digital(PRES_CONVERT_CMD)
     dtemp = read_pres_digital(TEMP_CONVERT_CMD)
+
+    if dpres == None or dtemp == None:
+        pres_init()
+        return None
 
     # using formulas from datasheet:
     dT = dtemp - pres_cal_data[4] * pow(2,8) #diff between actual and ref temps
