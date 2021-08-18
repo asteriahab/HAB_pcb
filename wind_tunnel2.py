@@ -189,7 +189,6 @@ def main():
 if __name__ == "__main__":
     main()
 
-
 # For testing:
 def clear_bus():
     global bus
@@ -214,3 +213,11 @@ def clear_imu():
 def get_imu():
     global imu
     return imu
+
+def clear_pres_cal_data():
+    global pres_cal_data
+    pres_cal_data = None
+
+def get_pres_cal_data():
+    global pres_cal_data
+    return pres_cal_data
