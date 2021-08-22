@@ -33,7 +33,7 @@ def read_i2c(sens_addr, data_addr, num_bytes):
 # Write given value for the given address to the i2c bus
 def write_i2c(addr,val):
     global bus
-
+    
     try:
         bus.write_byte(addr, val)
         return True
@@ -105,26 +105,34 @@ def read_temp():
 
     return None
 
+def calc_pres_vars(dtemp):
+    global pres_cal_data
+    
+    # using formulas from datasheet:
+    dT = dtemp - pres_cal_data[4] * pow(2,8) #diff between actual and ref temps
+    TEMP = 2000 + dT * pres_cal_data[5] / pow(2,23) # actual temperature
+
+    # calculate offset and sensitivity using formula from datasheet
+    OFF  = pres_cal_data[1]  * pow(2,17) + (pres_cal_data[3]  * dT)  / pow(2,6)
+    SENS = pres_cal_data[0] * pow(2,16) + (pres_cal_data[2] * dT ) / pow(2,7)
+
+    return [dT, TEMP, OFF, SENS]
+
 # Apply second order temperature compensation for temperatures below 20C for higher accuracy
 def add_pres_comp(dT, TEMP, OFF, SENS):
-    T2 = 0
-    OFF2 = 0
-    SENS2 = 0
-
     # calculations taken from datasheet
-    if TEMP < 2000:
-        T2 = pow(dT,2) / pow(2,31)
-        OFF2 = 61 * pow((TEMP - 2000),2) / pow(2,4)
-        SENS2 = 2 * pow((TEMP - 2000),2)
+    v1 = pow((TEMP - 2000),2)
+    v2 = pow((TEMP + 1500),2)
+    
+    if TEMP < 2000:              
+        OFF -= 61 * v1 / pow(2,4)
+        SENS -= 2 * v1
 
-    if TEMP < -1500:
-        OFF2  = OFF2 + 15 * pow((TEMP + 1500),2)
-        SENS2 = SENS2 + 8 * pow((TEMP + 1500),2)
-
-    # adjust temperature, offset, and sensitivity readings for low temperatures
-    TEMP -= T2
-    OFF -= OFF2
-    SENS -= SENS2
+    if TEMP < -1500:            
+        OFF -= 15 * v2
+        SENS -= 8 * v2
+        
+    TEMP -= pow(dT,2) / pow(2,31) if TEMP < 2000 else 0
 
     return [TEMP, OFF, SENS]
 
@@ -140,7 +148,8 @@ def read_pres_digital(cmd):
 def read_pres():
     global pres_cal_data
 
-    if pres_cal_data == None or None in pres_cal_data:
+    # make sure calibration data was collected successfully
+    if pres_cal_data == None or not all(isinstance(x,int) for x in pres_cal_data):
         pres_init()
         return None
 
@@ -148,18 +157,13 @@ def read_pres():
     dpres = read_pres_digital(PRES_CONVERT_CMD)
     dtemp = read_pres_digital(TEMP_CONVERT_CMD)
 
+    # make sure digital values were collected successfully
     if dpres == None or dtemp == None:
         pres_init()
         return None
 
-    # using formulas from datasheet:
-    dT = dtemp - pres_cal_data[4] * pow(2,8) #diff between actual and ref temps
-    TEMP = 2000 + dT * pres_cal_data[5] / pow(2,23) # actual temperature
-
-    # calculate offset and sensitivity using formula from datasheet
-    OFF  = pres_cal_data[1]  * pow(2,17) + (pres_cal_data[3]  * dT)  / pow(2,6)
-    SENS = pres_cal_data[0] * pow(2,16) + (pres_cal_data[2] * dT ) / pow(2,7)
-
+    dT, TEMP, OFF, SENS = calc_pres_vars(dtemp)
+    # compensate calculations for low temperatures
     TEMP, OFF, SENS = add_pres_comp(dT, TEMP, OFF, SENS)
 
     # calculate final pressure reading
@@ -207,12 +211,12 @@ def get_adt():
     return adt
 
 def clear_imu():
-    global imu
-    imu = None
+    global IMU
+    IMU = None
 
 def get_imu():
-    global imu
-    return imu
+    global IMU
+    return IMU
 
 def clear_pres_cal_data():
     global pres_cal_data
