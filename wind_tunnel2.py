@@ -177,7 +177,7 @@ def main():
     imu_init()
     temp_init()
 
-    with open('wind_tunnel.csv', mode='a') as datafile:
+    with open('/home/pi/Asteria_HAB/wind_tunnel.csv', mode='a') as datafile:
         filewriter = csv.writer(datafile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
         while True:
