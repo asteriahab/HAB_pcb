@@ -177,8 +177,9 @@ def main():
     imu_init()
     temp_init()
 
-    with open('/home/pi/Asteria_HAB/wind_tunnel.csv', mode='a') as datafile:
+    with open('/home/pi/Asteria_HAB/data/{}.csv'.format(round(time.time())), mode='a') as datafile:
         filewriter = csv.writer(datafile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        filewriter.writerow(['Time','Temp','Pressure','aX','aY','aZ','gX','gY','gZ','mX','mY','mZ'])
 
         while True:
             temp = read_temp()

@@ -1,5 +1,5 @@
 import pytest
-from wind_tunnel2 import temp_init, read_temp, clear_adt, get_adt
+from pcb import temp_init, read_temp, clear_adt, get_adt
 
 # Dummy exception for mocking
 EXCEPT = Exception('mocked')
@@ -67,7 +67,7 @@ class TestReadTemp:
 
     def test_read_temp_exception(self, mocker):
         clear_adt()
-        mocker.patch('wind_tunnel2.temp_init')
+        mocker.patch('pcb.temp_init')
 
         result = read_temp()
 

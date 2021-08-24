@@ -1,0 +1,11 @@
+#!/bin/bash
+
+a=0
+
+while [ $a -lt 10 ]
+do
+	sudo bash -c '/usr/bin/python3 /home/pi/Asteria_HAB/pcb.py > /home/pi/Asteria_HAB/pcb.log 2>&1'
+	a=`expr $a + 1`
+done
+
+#sudo reboot

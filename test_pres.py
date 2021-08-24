@@ -1,5 +1,5 @@
 import pytest
-from wind_tunnel2 import pres_init, add_pres_comp, read_pres_digital, read_pres, clear_pres_cal_data, get_pres_cal_data, calc_pres_vars
+from pcb import pres_init, add_pres_comp, read_pres_digital, read_pres, clear_pres_cal_data, get_pres_cal_data, calc_pres_vars
 
 # Expected calculation results with mocked calibration data and digital readings with values 1
 dT = -255
@@ -9,11 +9,11 @@ SENS = pow(2,16)+dT/pow(2,7)
 
 @pytest.fixture
 def mocked_readi2c(mocker):
-    return mocker.patch('wind_tunnel2.read_i2c')
+    return mocker.patch('pcb.read_i2c')
 
 @pytest.fixture
 def mocked_writei2c(mocker):
-    return mocker.patch('wind_tunnel2.write_i2c')
+    return mocker.patch('pcb.write_i2c')
 
 @pytest.fixture
 def mocked_sleep(mocker):
@@ -130,17 +130,17 @@ class TestCalcPresVars:
 class TestReadPres:
     @pytest.fixture
     def mock_readpd(self, mocker):
-        return mocker.patch('wind_tunnel2.read_pres_digital')
+        return mocker.patch('pcb.read_pres_digital')
     
     @pytest.fixture
     def mock_pinit(self, mocker):
-        return mocker.patch('wind_tunnel2.pres_init')
+        return mocker.patch('pcb.pres_init')
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def test_read_pres_success(self, mocker, mock_pres_cal_data, mock_readpd):
         expected = (SENS/pow(2,21) - OFF)/pow(2,15)/100
         mock_readpd.return_value = 1
-        mocker.patch('wind_tunnel2.calc_pres_vars', return_value=[dT, TEMP,OFF,SENS])
-        mocker.patch('wind_tunnel2.add_pres_comp', return_value=[TEMP,OFF,SENS])
+        mocker.patch('pcb.calc_pres_vars', return_value=[dT, TEMP,OFF,SENS])
+        mocker.patch('pcb.add_pres_comp', return_value=[TEMP,OFF,SENS])
         
         result = read_pres()
         

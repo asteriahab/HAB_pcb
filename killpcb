@@ -1,0 +1,8 @@
+#!/bin/bash
+
+kill_func () {
+	sudo kill $(sudo ps -ax | egrep "$1$" | grep -o -P '[0-9]+(?= )' | head -1)
+}
+
+kill_func './runpcb'
+kill_func '/usr/bin/python3 /home/pi/Asteria_HAB/pcb.py'

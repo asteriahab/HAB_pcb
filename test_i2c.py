@@ -1,5 +1,5 @@
 import pytest
-from wind_tunnel2 import bus_init, clear_bus, get_bus, read_i2c, write_i2c, PRES_CAL_ADDR, PRES_ADDR
+from pcb import bus_init, clear_bus, get_bus, read_i2c, write_i2c, PRES_CAL_ADDR, PRES_ADDR
 
 @pytest.fixture
 def mock_bus(mocker):

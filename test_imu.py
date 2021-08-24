@@ -1,5 +1,5 @@
 import pytest
-from wind_tunnel2 import imu_init, read_imu, clear_imu, get_imu
+from pcb import imu_init, read_imu, clear_imu, get_imu
 
 # Dummy exception for mocking
 EXCEPT = Exception('mocked')
@@ -70,7 +70,7 @@ class TestReadImu:
 
     @pytest.fixture
     def mock_imu_init(self, mocker):
-        return mocker.patch('wind_tunnel2.imu_init')
+        return mocker.patch('pcb.imu_init')
 
     @pytest.fixture(autouse=True)
     def read_imu_setup(self, mock_imu_obj):
