@@ -4,7 +4,9 @@ a=0
 
 while [ $a -lt 10 ]
 do
-	sudo bash -c '/usr/bin/python3 /home/pi/Asteria_HAB/pcb.py > /home/pi/Asteria_HAB/pcb.log 2>&1'
+	echo "---------------Started: $(date -Iseconds)----------------------------" >> /home/pi/Asteria_HAB/pcb.log
+	sudo bash -c '/usr/bin/python3 /home/pi/Asteria_HAB/pcb.py >> /home/pi/Asteria_HAB/pcb.log 2>&1'
+	echo "---------------Stopped: $(date -Iseconds)----------------------------" >> /home/pi/Asteria_HAB/pcb.log
 	a=`expr $a + 1`
 done
 
