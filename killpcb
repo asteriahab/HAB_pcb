@@ -6,3 +6,5 @@ kill_func () {
 
 kill_func './runpcb'
 kill_func '/usr/bin/python3 /home/pi/Asteria_HAB/pcb.py'
+
+echo "---------------Stopped: $(date -Iseconds)----------------------------" >> /home/pi/Asteria_HAB/pcb.log

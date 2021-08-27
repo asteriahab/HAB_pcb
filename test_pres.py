@@ -137,14 +137,15 @@ class TestReadPres:
         return mocker.patch('pcb.pres_init')
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def test_read_pres_success(self, mocker, mock_pres_cal_data, mock_readpd):
-        expected = (SENS/pow(2,21) - OFF)/pow(2,15)/100
+        expected_pres = (SENS/pow(2,21) - OFF)/pow(2,15)/100
+        expected_temp = TEMP / 100.0
         mock_readpd.return_value = 1
         mocker.patch('pcb.calc_pres_vars', return_value=[dT, TEMP,OFF,SENS])
         mocker.patch('pcb.add_pres_comp', return_value=[TEMP,OFF,SENS])
         
-        result = read_pres()
+        result_pres, result_temp = read_pres()
         
-        assert result == expected
+        assert result_pres == expected_pres and result_temp == expected_temp
 
 
     def test_read_pres_no_cal_data(self):

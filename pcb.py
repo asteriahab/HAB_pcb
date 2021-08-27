@@ -1,4 +1,4 @@
-import smbus
+import smbus2
 import time
 import board
 import busio
@@ -47,7 +47,7 @@ def bus_init():
     global bus
 
     try:
-        bus = smbus.SMBus(1)
+        bus = smbus2.SMBus(1)
     except:
         bus = None
 
@@ -75,7 +75,7 @@ def imu_init():
     global IMU
 
     try:
-       IMU = qwiic_icm20948.QwiicIcm20948(IMU_ADDR)
+       IMU = qwiic_icm20948.QwiicIcm20948(address=IMU_ADDR)
        if IMU.connected:
            IMU.begin()
     except:
@@ -87,8 +87,8 @@ def read_imu():
 
     try:
         if IMU.dataReady():
-            IMU.getAgmt()
-            return [IMU.axRaw, IMU.ayRaw, IMU.azRaw, IMU.gxRaw, IMU.gyRaw, IMU.gzRaw, IMU.mxRaw, IMU.myRaw, IMU.mzRaw]
+            if IMU.getAgmt():
+                return [IMU.axRaw, IMU.ayRaw, IMU.azRaw, IMU.gxRaw, IMU.gyRaw, IMU.gzRaw, IMU.mxRaw, IMU.myRaw, IMU.mzRaw]
     except:
         imu_init()
 
@@ -168,8 +168,9 @@ def read_pres():
 
     # calculate final pressure reading
     pressure = (dpres * SENS / pow(2,21) - OFF) / pow(2,15) / 100.0
+    temp = TEMP / 100.0
 
-    return pressure
+    return [pressure, temp]
 
 def main():
     bus_init()
@@ -177,19 +178,18 @@ def main():
     imu_init()
     temp_init()
 
+
     with open('/home/pi/Asteria_HAB/data/{}.csv'.format(round(time.time())), mode='a') as datafile:
         filewriter = csv.writer(datafile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        filewriter.writerow(['Time','Temp','Pressure','aX','aY','aZ','gX','gY','gZ','mX','mY','mZ'])
+        filewriter.writerow(['Time','Temp','Pressure','Pressure Temp','aX','aY','aZ','gX','gY','gZ','mX','mY','mZ'])
 
         while True:
             temp = read_temp()
-            pres = read_pres()
+            pres, pres_temp = read_pres()
             ax,ay,az,gx,gy,gz,mx,my,mz = read_imu()
 
-            filewriter.writerow([time.time(), temp, pres, ax, ay , az, gx, gy, gz, mx, my, mz])
+            filewriter.writerow([time.time(), temp, pres, pres_temp, ax, ay , az, gx, gy, gz, mx, my, mz])
             datafile.flush() #make sure no data left in file buffer
-
-            time.sleep(0.5)
 
 if __name__ == "__main__":
     main()

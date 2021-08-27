@@ -3,7 +3,7 @@ from pcb import bus_init, clear_bus, get_bus, read_i2c, write_i2c, PRES_CAL_ADDR
 
 @pytest.fixture
 def mock_bus(mocker):
-    return mocker.patch('smbus.SMBus')
+    return mocker.patch('smbus2.SMBus')
 
 #=================================================================================================
 # TEST bus_init()
